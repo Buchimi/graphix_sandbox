@@ -30,17 +30,21 @@ fn create_program(display: &Display) -> glium::Program {
         #version 140
 
         in vec2 position;
+        uniform float x;
         void main() {
-            gl_Position = vec4(position, 0.0, 1.0);
+            vec2 pos = position;
+            pos.x += x;
+            gl_Position = vec4(pos, 0.0, 1.0);
         }
     "#;
     let fragment_shader_src = r#"
     #version 140
 
     out vec4 color;
-
+    uniform float x;
     void main() {
-        color = vec4(1.0, 0.0, 0.0, 1.0);
+        
+        color = vec4(1.0 * x, 1.0 * x * 0.5, 1 * (x * 0.2), 1.0);
     }
 "#;
     let program =
@@ -94,16 +98,16 @@ fn main() {
             // We use the sine of t as an offset, this way we get a nice smooth animation
             let x_off = t.sin() * 0.5;
 
-            let shape = vec![
-                Vertex { position: [-0.5 + x_off, -0.5] },
-                Vertex { position: [ 0.0 + x_off,  0.5] },
-                Vertex { position: [ 0.5 + x_off, -0.25] }
-            ];
+            // let shape = vec![
+            //     Vertex { position: [-0.5 + x_off, -0.5] },
+            //     Vertex { position: [ 0.0 + x_off,  0.5] },
+            //     Vertex { position: [ 0.5 + x_off, -0.25] }
+            // ];
             let vertex_buffer = glium::VertexBuffer::new(&display, &shape).unwrap();
 
             let mut target = display.draw();
             target.clear_color(0.0, 0.0, 1.0, 1.0);
-            target.draw(&vertex_buffer, &indices, &program, &glium::uniforms::EmptyUniforms,
+            target.draw(&vertex_buffer, &indices, &program, &uniform! {x : x_off},
                     &Default::default()).unwrap();
             target.finish().unwrap();
 
