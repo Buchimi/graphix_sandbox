@@ -31,10 +31,11 @@ fn create_program(display: &Display) -> glium::Program {
 
         in vec2 position;
         uniform float x;
+        uniform mat4 matrix;
+
         void main() {
             vec2 pos = position;
-            pos.x += x;
-            gl_Position = vec4(pos, 0.0, 1.0);
+            gl_Position = matrix * vec4(pos, 0.0, 1.0);
         }
     "#;
     let fragment_shader_src = r#"
@@ -51,8 +52,17 @@ fn create_program(display: &Display) -> glium::Program {
         glium::Program::from_source(display, vertex_shader_src, fragment_shader_src, None).unwrap();
     program
 }
-fn main() {
 
+fn derive_matrix(translation_vec2: (f32, f32), rotation_vec2: (f32, f32)) -> [[f32; 4]; 4] {
+    let matrix = [
+        [rotation_vec2.0.cos(), rotation_vec2.0.sin(), 0.0, 0.0],
+        [-rotation_vec2.1.sin(), rotation_vec2.1.cos(), 0.0, 0.0],
+        [0.0, 0.0, 1.0, 0.0],
+        [translation_vec2.0, translation_vec2.1, 0.0, 1.0],
+    ];
+    matrix
+}
+fn main() {
     let (event_loop, display) = setup();
     let vertex1 = Vertex {
         position: [-0.5, -0.5],
@@ -73,45 +83,56 @@ fn main() {
     let mut frame = display.draw();
     frame.clear_color(0.0, 0.0, 1.0, 1.0);
 
-    frame.draw(&vertex_buffer, &indices, &program, &glium::uniforms::EmptyUniforms, &Default::default()).unwrap();
+    frame
+        .draw(
+            &vertex_buffer,
+            &indices,
+            &program,
+            &glium::uniforms::EmptyUniforms,
+            &Default::default(),
+        )
+        .unwrap();
 
     frame.finish().unwrap();
     let mut t: f32 = 0.0;
-    
-    event_loop.run(move |event, _window_target, control_flow|{ 
-        
+
+    event_loop.run(move |event, _window_target, control_flow| {
         match event {
-        glium::glutin::event::Event::WindowEvent {
-            window_id: _,
-            event,
-        } => match event {
-            WindowEvent::CloseRequested => {
-                *control_flow = ControlFlow::Exit;
+            glium::glutin::event::Event::WindowEvent {
+                window_id: _,
+                event,
+            } => match event {
+                WindowEvent::CloseRequested => {
+                    *control_flow = ControlFlow::Exit;
+                }
+                _ => (),
+            },
+            glium::glutin::event::Event::RedrawEventsCleared => {
+                display.gl_window().window().request_redraw();
+            }
+            glium::glutin::event::Event::RedrawRequested(_) => {
+                t += 0.002;
+                // We use the sine of t as an offset, this way we get a nice smooth animation
+                let x_off = t;//.sin() * 0.5;
+
+                let vertex_buffer = glium::VertexBuffer::new(&display, &shape).unwrap();
+
+                let mut target = display.draw();
+                let matrix = derive_matrix((0.0 , 0.0), (x_off, x_off));
+
+                target.clear_color(0.0, 0.0, 1.0, 1.0);
+                target
+                    .draw(
+                        &vertex_buffer,
+                        &indices,
+                        &program,
+                        &uniform! {x : x_off, matrix : matrix},
+                        &Default::default(),
+                    )
+                    .unwrap();
+                target.finish().unwrap();
             }
             _ => (),
-        },
-        glium::glutin::event::Event::RedrawEventsCleared =>{
-            display.gl_window().window().request_redraw();
-        }, 
-        glium::glutin::event::Event::RedrawRequested(_) =>{
-            t += 0.002;
-            // We use the sine of t as an offset, this way we get a nice smooth animation
-            let x_off = t.sin() * 0.5;
-
-            // let shape = vec![
-            //     Vertex { position: [-0.5 + x_off, -0.5] },
-            //     Vertex { position: [ 0.0 + x_off,  0.5] },
-            //     Vertex { position: [ 0.5 + x_off, -0.25] }
-            // ];
-            let vertex_buffer = glium::VertexBuffer::new(&display, &shape).unwrap();
-
-            let mut target = display.draw();
-            target.clear_color(0.0, 0.0, 1.0, 1.0);
-            target.draw(&vertex_buffer, &indices, &program, &uniform! {x : x_off},
-                    &Default::default()).unwrap();
-            target.finish().unwrap();
-
         }
-        _ => (),
-    }})
+    })
 }
